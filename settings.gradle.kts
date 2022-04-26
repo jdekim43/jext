@@ -5,5 +5,7 @@ include(
     "jext-ktor",
     "jext-koin",
     "jext-exposed",
-    "jext-exposed:jext-exposed-koin"
+    "jext-exposed:jext-exposed-koin",
+    "jext-gson",
+    "jext-kotlinx-serialization"
 )

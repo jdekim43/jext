@@ -1,16 +1,16 @@
 package kr.jadekim.jext.ktor.module
 
 import com.google.gson.Gson
-import io.ktor.application.*
-import io.ktor.features.*
-import io.ktor.gson.*
 import io.ktor.http.*
+import io.ktor.serialization.gson.*
+import io.ktor.server.application.*
+import io.ktor.server.plugins.contentnegotiation.*
 
-object ContentNegotiationFeatureModule : KtorModuleFactory<ContentNegotiationFeatureModule.Configuration> {
+object ContentNegotiationModule : KtorModuleFactory<ContentNegotiationModule.Configuration> {
 
     class Configuration : KtorModuleConfiguration {
 
-        var configure: ContentNegotiation.Configuration.() -> Unit = {
+        var configure: ContentNegotiationConfig.() -> Unit = {
             register(ContentType.Application.Json, GsonConverter())
         }
 

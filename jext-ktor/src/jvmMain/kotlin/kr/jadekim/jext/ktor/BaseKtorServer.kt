@@ -1,20 +1,17 @@
 package kr.jadekim.jext.ktor
 
-import io.ktor.config.*
-import io.ktor.routing.*
+import com.google.gson.Gson
+import io.ktor.server.config.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
+import io.ktor.server.routing.*
+import kr.jadekim.jext.ktor.module.*
 import kr.jadekim.server.http.BaseHttpServer
-import kr.jadekim.jext.ktor.module.KtorDefaultModules
-import kr.jadekim.jext.ktor.module.KtorModule
-import kr.jadekim.jext.ktor.module.ktorModule
 import org.slf4j.LoggerFactory
 import kotlin.coroutines.CoroutineContext
 import kotlin.coroutines.EmptyCoroutineContext
-import kotlin.time.Duration
-import kotlin.time.ExperimentalTime
+import kotlin.time.*
 
-@OptIn(ExperimentalTime::class)
 abstract class BaseKtorServer(
     serverName: String? = null,
     serviceHost: String = "0.0.0.0",
@@ -25,7 +22,7 @@ abstract class BaseKtorServer(
 ) : BaseHttpServer(serverName, serviceHost, servicePort) {
 
     var blockingStart = true
-    var stopGracePeriod = Duration.seconds(15)
+    var stopGracePeriod = 15.toDuration(DurationUnit.SECONDS)
 
     private val configuration: ApplicationConfig = MapApplicationConfig()
 
@@ -52,9 +49,12 @@ abstract class BaseKtorServer(
         //do nothing
     }
 
-    protected open fun createModules(defaultModules: KtorDefaultModules = KtorDefaultModules()): List<KtorModule> {
-        return defaultModules.get()
-    }
+    protected open fun createModules(): List<KtorModule> = listOf(
+        DefaultFeatureModule.create(),
+        LogPluginsModule.create(),
+        ContentNegotiationModule.create { gson(Gson()) },
+        ErrorHandlerModule.create(),
+    )
 
     protected open fun createKtorServer(): ApplicationEngine {
         return embeddedServer(Netty, createApplicationEngineEnvironment(), nettyConfiguration)

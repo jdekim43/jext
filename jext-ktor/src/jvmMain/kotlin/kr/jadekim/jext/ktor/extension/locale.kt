@@ -1,11 +1,10 @@
 package kr.jadekim.jext.ktor.extension
 
-import io.ktor.application.*
-import io.ktor.request.*
-import io.ktor.util.pipeline.*
+import io.ktor.server.application.*
+import io.ktor.server.request.*
 import java.util.*
 
-fun PipelineContext<*, ApplicationCall>.locale(
+fun ApplicationCall.locale(
     support: List<Locale>,
     default: Locale = support.first(),
     cookieName: String? = "language"
@@ -16,15 +15,15 @@ fun PipelineContext<*, ApplicationCall>.locale(
         languages = acceptLanguage()
     }
 
-    if (languages.isNullOrEmpty()) {
+    if (languages.isEmpty()) {
         return default
     }
 
     return Locale.lookup(languages, support) ?: default
 }
 
-fun PipelineContext<*, ApplicationCall>.acceptLanguage(): List<Locale.LanguageRange> {
-    val text = context.request.acceptLanguage()
+fun ApplicationCall.acceptLanguage(): List<Locale.LanguageRange> {
+    val text = request.acceptLanguage()
 
     if (text.isNullOrBlank()) {
         return emptyList()
@@ -37,8 +36,8 @@ fun PipelineContext<*, ApplicationCall>.acceptLanguage(): List<Locale.LanguageRa
     }
 }
 
-fun PipelineContext<*, ApplicationCall>.languageFromCookie(cookieName: String = "language"): List<Locale.LanguageRange> {
-    val text = context.request.cookies[cookieName]
+fun ApplicationCall.languageFromCookie(cookieName: String = "language"): List<Locale.LanguageRange> {
+    val text = request.cookies[cookieName]
 
     if (text.isNullOrBlank()) {
         return emptyList()

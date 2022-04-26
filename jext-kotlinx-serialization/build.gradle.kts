@@ -1,6 +1,5 @@
 plugins {
     kotlin("multiplatform")
-    id("org.jetbrains.dokka")
 }
 
 kotlin {
@@ -16,29 +15,29 @@ kotlin {
     }
 
     sourceSets {
+        all {
+            languageSettings {
+                optIn("kotlin.RequiresOptIn")
+            }
+        }
+
         val commonMain by getting {
             dependencies {
-                val exposedVersion: String by project
-                val kotlinxCoroutineVersion: String by project
+                val commonVersion: String by project
+                val kotlinxSerializationVersion: String by project
 
-                api("org.jetbrains.exposed:exposed-core:$exposedVersion")
+                api("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion")
 
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutineVersion")
+                compileOnly("kr.jadekim:common-encoder:$commonVersion")
             }
         }
         val commonTest by getting {
             dependencies {
-                implementation(kotlin("test"))
+                implementation(kotlin("test-common"))
+                implementation(kotlin("test-annotations-common"))
             }
         }
-        val jvmMain by getting {
-            dependencies {
-                val exposedVersion: String by project
-
-                api("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
-                api("org.jetbrains.exposed:exposed-java-time:$exposedVersion")
-            }
-        }
+        val jvmMain by getting
         val jvmTest by getting {
             dependencies {
                 val junitVersion: String by project

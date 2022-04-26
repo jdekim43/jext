@@ -1,7 +1,7 @@
 package kr.jadekim.jext.ktor.extension
 
-import io.ktor.application.*
-import io.ktor.response.*
+import io.ktor.server.application.*
+import io.ktor.server.response.*
 import io.ktor.util.pipeline.*
 import kr.jadekim.common.exception.ErrorCode
 import kr.jadekim.server.http.exception.HttpServerException

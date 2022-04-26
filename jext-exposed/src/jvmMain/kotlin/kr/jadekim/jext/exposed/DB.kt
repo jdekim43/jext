@@ -10,7 +10,7 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 import javax.sql.DataSource
 
-val THREAD_COUNT_AUTO = -1
+const val THREAD_COUNT_AUTO = -1
 
 interface ReadDB {
 

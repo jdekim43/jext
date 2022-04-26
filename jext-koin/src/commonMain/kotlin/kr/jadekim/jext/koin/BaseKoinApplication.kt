@@ -1,22 +1,27 @@
 package kr.jadekim.jext.koin
 
-import kr.jadekim.jext.koin.util.loadPropertiesFromArguments
-import kr.jadekim.jext.koin.util.shutdownHook
 import kr.jadekim.common.enumeration.Environment
 import kr.jadekim.common.enumeration.IEnvironment
 import kr.jadekim.common.util.parseArgument
+import kr.jadekim.jext.koin.extension.Properties
+import kr.jadekim.jext.koin.util.loadPropertiesFromArguments
+import kr.jadekim.jext.koin.util.shutdownHook
 import kr.jadekim.logger.JLog
 import kr.jadekim.logger.JLogger
 import kr.jadekim.logger.context.GlobalLogContext
 import kr.jadekim.logger.integration.koin.KoinLogger
 import kr.jadekim.logger.pipeline.LoggerNameShorter
 import kr.jadekim.logger.pipeline.StdOutPrinter
+import org.koin.core.Koin
 import org.koin.core.context.KoinContext
 import org.koin.core.module.Module
+import org.koin.core.module.dsl.binds
+import org.koin.core.module.dsl.withOptions
 import org.koin.core.qualifier.StringQualifier
-import org.koin.dsl.bind
 import org.koin.dsl.module
 import org.koin.mp.KoinPlatformTools
+
+val APP_PROPERTIES = StringQualifier("app-properties")
 
 abstract class BaseKoinApplication(
     private vararg val args: String,
@@ -24,7 +29,7 @@ abstract class BaseKoinApplication(
     val environment: IEnvironment? = null,
     val version: String? = null,
     logger: JLogger? = null,
-    properties: Map<String, String>? = null,
+    properties: Properties? = null,
     val koinContext: KoinContext = KoinPlatformTools.defaultContext(),
 ) {
 
@@ -35,18 +40,19 @@ abstract class BaseKoinApplication(
     abstract val modules: List<Module>
 
     val applicationName: String = applicationName ?: this::class.simpleName ?: "KoinApplication"
-    val propertiesBeanQualifier = StringQualifier("${this.applicationName}-properties")
 
     var isInitialized = false
         private set
 
-    var properties: Map<String, String> = properties ?: emptyMap()
+    var properties: Properties = properties ?: Properties()
         protected set
 
     lateinit var environmentOption: EnvironmentOption
         protected set
 
     val isGlobal: Boolean = koinContext == KoinPlatformTools.defaultContext()
+    lateinit var koin: Koin
+        private set
 
     protected val logger = logger ?: JLog.get(this.applicationName)
 
@@ -64,7 +70,7 @@ abstract class BaseKoinApplication(
         }
 
         environmentOption = getEnvironmentOption(environment)
-        properties = loadPropertiesFromArguments(arguments) + properties
+        properties = Properties(loadPropertiesFromArguments(arguments) + properties)
 
         if (isGlobal) {
             GlobalLogContext["applicationName"] = this.applicationName
@@ -75,6 +81,10 @@ abstract class BaseKoinApplication(
         }
 
         onInit()
+
+        koin = initContainer().koin
+        onInitializedContainer()
+
         isInitialized = true
     }
 
@@ -84,9 +94,6 @@ abstract class BaseKoinApplication(
         }
 
         logger.info { "Start $applicationName" }
-
-        initContainer()
-        onInitializedContainer()
 
         shutdownHook {
             if (isStart) {
@@ -122,8 +129,10 @@ abstract class BaseKoinApplication(
         logger(KoinLogger())
         properties(properties)
         modules(module {
-            single { environment } bind Environment::class
-            single(propertiesBeanQualifier) { properties }
+            single { environment } withOptions {
+                binds(listOf(Environment::class))
+            }
+            single(APP_PROPERTIES) { properties }
             single { properties }
         })
         modules(this@BaseKoinApplication.modules)

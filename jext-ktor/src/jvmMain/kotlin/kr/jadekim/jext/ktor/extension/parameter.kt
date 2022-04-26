@@ -1,8 +1,8 @@
 package kr.jadekim.jext.ktor.extension
 
-import io.ktor.application.*
 import io.ktor.http.*
-import io.ktor.request.*
+import io.ktor.server.application.*
+import io.ktor.server.request.*
 import io.ktor.util.*
 import io.ktor.util.pipeline.*
 import kr.jadekim.server.http.exception.MissingParameterException
@@ -50,6 +50,8 @@ suspend fun PipelineContext<*, ApplicationCall>.bodyParamSafe(key: String, defau
 suspend fun PipelineContext<*, ApplicationCall>.bodyParam(key: String, default: String? = null): String {
     return bodyParamSafe(key, default) ?: throw MissingParameterException("required $key")
 }
+
+suspend inline fun <reified T : Any> PipelineContext<Unit, ApplicationCall>.body(): T = context.receive()
 
 fun Parameters?.toSingleValueMap(): Map<String, String> {
     return this?.toMap()

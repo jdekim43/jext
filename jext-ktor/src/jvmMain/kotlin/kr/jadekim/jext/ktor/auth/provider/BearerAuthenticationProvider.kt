@@ -1,9 +1,9 @@
 package kr.jadekim.jext.ktor.auth.provider
 
-import io.ktor.application.*
-import io.ktor.auth.*
 import io.ktor.http.auth.*
-import io.ktor.request.*
+import io.ktor.server.application.*
+import io.ktor.server.auth.*
+import io.ktor.server.request.*
 import kr.jadekim.server.http.exception.UnauthorizedException
 
 
@@ -19,7 +19,7 @@ class BearerAuthenticationProvider internal constructor(
 
     internal val authenticationFunction = configuration.authenticationFunction
 
-    class Configuration internal constructor(name: String?) : AuthenticationProvider.Configuration(name) {
+    class Configuration internal constructor(name: String?) : AuthenticationProvider.Config(name) {
 
         internal var authenticationFunction: AuthenticationFunction<BearerCredential> = { null }
 
@@ -27,19 +27,11 @@ class BearerAuthenticationProvider internal constructor(
             authenticationFunction = body
         }
     }
-}
 
-@Deprecated("")
-fun Authentication.Configuration.bearer(
-    name: String? = null,
-    configure: BearerAuthenticationProvider.Configuration.() -> Unit
-) {
-    val provider = BearerAuthenticationProvider(BearerAuthenticationProvider.Configuration(name).apply(configure))
-    val authenticate = provider.authenticationFunction
-
-    provider.pipeline.intercept(AuthenticationPipeline.RequestAuthentication) { context ->
+    override suspend fun onAuthenticate(context: AuthenticationContext) {
+        val call = context.call
         val credentials = call.request.bearerAuthenticationCredentials()
-        val principal = credentials?.let { authenticate(call, it) }
+        val principal = credentials?.let { authenticationFunction(call, it) }
 
         val cause = when {
             credentials == null -> AuthenticationFailedCause.NoCredentials
@@ -48,7 +40,7 @@ fun Authentication.Configuration.bearer(
         }
 
         if (cause != null) {
-            context.challenge(name ?: "BearerToken", cause) {
+            context.challenge(name ?: "BearerToken", cause) { _, _ ->
                 throw UnauthorizedException(credentials?.token ?: "")
             }
         }
@@ -57,6 +49,14 @@ fun Authentication.Configuration.bearer(
             context.principal(principal)
         }
     }
+}
+
+@Deprecated("")
+fun AuthenticationConfig.bearer(
+    name: String? = null,
+    configure: BearerAuthenticationProvider.Configuration.() -> Unit
+) {
+    val provider = BearerAuthenticationProvider(BearerAuthenticationProvider.Configuration(name).apply(configure))
 
     register(provider)
 }

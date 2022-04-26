@@ -7,9 +7,10 @@ import kr.jadekim.jext.exposed.ReadDB
 import kr.jadekim.jext.koin.extension.getInt
 import kr.jadekim.jext.koin.extension.getString
 import org.koin.core.module.Module
+import org.koin.core.module.dsl.binds
+import org.koin.core.module.dsl.withOptions
 import org.koin.core.qualifier.StringQualifier
 import org.koin.core.scope.Scope
-import org.koin.dsl.bind
 import org.koin.dsl.onClose
 import java.io.Closeable
 import java.lang.Integer.max
@@ -123,9 +124,9 @@ fun Module.db(
         }
 
         configure(CrudDB(crudDataSource, readDataSource, threadCountValue))
+    } withOptions {
+        binds(listOf(ReadDB::class, DB::class))
     }
-        .bind(ReadDB::class)
-        .bind(DB::class)
 }
 
 fun Module.db(
