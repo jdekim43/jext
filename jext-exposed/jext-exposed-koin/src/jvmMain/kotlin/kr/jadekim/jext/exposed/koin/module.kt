@@ -125,7 +125,7 @@ fun Module.db(
 
         configure(CrudDB(crudDataSource, readDataSource, threadCountValue))
     } withOptions {
-        binds(listOf(ReadDB::class, DB::class))
+        binds(listOf(ReadDB::class))
     }
 }
 

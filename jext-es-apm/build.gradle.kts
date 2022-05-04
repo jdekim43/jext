@@ -3,10 +3,12 @@ plugins {
 }
 
 dependencies {
-    val gsonVersion: String by project
+    val esApmVersion: String by project
+    val kotlinxCoroutineVersion: String by project
 
-    api("com.google.code.gson:gson:$gsonVersion")
-    implementation(kotlin("reflect"))
+    api("co.elastic.apm:apm-agent-api:$esApmVersion")
+
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutineVersion")
 }
 
 tasks {

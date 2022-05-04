@@ -8,7 +8,7 @@ plugins {
 
 allprojects {
     group = "kr.jadekim"
-    version = "2.0.1-alpha5"
+    version = "2.0.1-alpha8"
 
     repositories {
         mavenCentral()

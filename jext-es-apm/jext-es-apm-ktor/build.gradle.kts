@@ -3,10 +3,12 @@ plugins {
 }
 
 dependencies {
-    val gsonVersion: String by project
+    val jLoggerVersion: String by project
 
-    api("com.google.code.gson:gson:$gsonVersion")
-    implementation(kotlin("reflect"))
+    implementation(project(":jext-es-apm"))
+    implementation(project(":jext-ktor"))
+    compileOnly("kr.jadekim:j-logger:$jLoggerVersion")
+    compileOnly("kr.jadekim:j-logger-coroutine:$jLoggerVersion")
 }
 
 tasks {

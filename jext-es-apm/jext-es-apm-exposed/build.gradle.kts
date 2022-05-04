@@ -3,10 +3,8 @@ plugins {
 }
 
 dependencies {
-    val gsonVersion: String by project
-
-    api("com.google.code.gson:gson:$gsonVersion")
-    implementation(kotlin("reflect"))
+    implementation(project(":jext-es-apm"))
+    implementation(project(":jext-exposed"))
 }
 
 tasks {
