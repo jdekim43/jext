@@ -6,6 +6,7 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import io.ktor.util.*
+import io.ktor.util.pipeline.*
 import kotlinx.coroutines.withContext
 import kr.jadekim.jext.apm.es.EsApmContext
 import kr.jadekim.jext.ktor.module.KtorModule
@@ -13,6 +14,12 @@ import kr.jadekim.jext.ktor.module.KtorModuleConfiguration
 import kr.jadekim.jext.ktor.module.KtorModuleFactory
 import kr.jadekim.jext.ktor.module.ktorModule
 import kotlin.coroutines.CoroutineContext
+
+val ES_APM_ENABLE = AttributeKey<Boolean>("EsApmIntegration.enable")
+
+fun PipelineContext<Unit, ApplicationCall>.disableEsApm() {
+    context.attributes.put(ES_APM_ENABLE, false)
+}
 
 object EsApmServerModule : KtorModuleFactory<EsApmServerModule.Configuration> {
 
@@ -71,6 +78,10 @@ class EsApmServerPlugin private constructor(configuration: Configuration) {
             }
 
             pipeline.intercept(ApplicationCallPipeline.Monitoring) {
+                if (context.attributes.getOrNull(ES_APM_ENABLE) == false) {
+                    return@intercept
+                }
+
                 val transaction = ElasticApm.startTransactionWithRemoteParent { context.request.header(it) }
 
                 var apmCoroutineContext = coroutineContext
