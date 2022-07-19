@@ -6,7 +6,6 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
 import io.ktor.util.*
-import io.ktor.util.pipeline.*
 import kotlinx.coroutines.withContext
 import kr.jadekim.jext.apm.es.EsApmContext
 import kr.jadekim.jext.ktor.module.KtorModule
@@ -14,12 +13,6 @@ import kr.jadekim.jext.ktor.module.KtorModuleConfiguration
 import kr.jadekim.jext.ktor.module.KtorModuleFactory
 import kr.jadekim.jext.ktor.module.ktorModule
 import kotlin.coroutines.CoroutineContext
-
-val ES_APM_ENABLE = AttributeKey<Boolean>("EsApmIntegration.enable")
-
-fun PipelineContext<Unit, ApplicationCall>.disableEsApm() {
-    context.attributes.put(ES_APM_ENABLE, false)
-}
 
 object EsApmServerModule : KtorModuleFactory<EsApmServerModule.Configuration> {
 
@@ -29,12 +22,14 @@ object EsApmServerModule : KtorModuleFactory<EsApmServerModule.Configuration> {
         var transactionName: (ApplicationCall) -> String = defaultConfiguration.transactionName
         var setupTransaction: Transaction.(ApplicationCall, CoroutineContext) -> Unit =
             defaultConfiguration.setupTransaction
+        var shouldTrace: (ApplicationCall) -> Boolean = defaultConfiguration.shouldTrace
     }
 
     override fun create(config: Configuration): KtorModule = ktorModule {
         install(EsApmServerPlugin) {
             transactionName = config.transactionName
             setupTransaction = config.setupTransaction
+            shouldTrace = config.shouldTrace
         }
     }
 
@@ -56,10 +51,12 @@ class EsApmServerPlugin private constructor(configuration: Configuration) {
                 }
             }
         }
+        var shouldTrace: (ApplicationCall) -> Boolean = { true }
     }
 
     val transactionName = configuration.transactionName
     val setupTransaction = configuration.setupTransaction
+    val shouldTrace = configuration.shouldTrace
 
     companion object Plugin : BaseApplicationPlugin<ApplicationCallPipeline, Configuration, EsApmServerPlugin> {
 
@@ -78,7 +75,7 @@ class EsApmServerPlugin private constructor(configuration: Configuration) {
             }
 
             pipeline.intercept(ApplicationCallPipeline.Monitoring) {
-                if (context.attributes.getOrNull(ES_APM_ENABLE) == false) {
+                if (!plugin.shouldTrace(context)) {
                     return@intercept
                 }
 
