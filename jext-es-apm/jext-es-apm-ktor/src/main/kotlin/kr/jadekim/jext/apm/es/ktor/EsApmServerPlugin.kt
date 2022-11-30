@@ -87,8 +87,10 @@ class EsApmServerPlugin private constructor(configuration: Configuration) {
                     val logContext = apmCoroutineContext[kr.jadekim.logger.coroutine.context.CoroutineLogContext]
                         ?: kr.jadekim.logger.coroutine.context.CoroutineLogContext()
 
-                    logContext["trace.id"] = transaction.traceId
-                    logContext["transaction.id"] = transaction.id
+                    logContext["tracing"] = mapOf(
+                        "traceId" to transaction.traceId,
+                        "transactionId" to transaction.id,
+                    )
 
                     apmCoroutineContext += logContext
                 }

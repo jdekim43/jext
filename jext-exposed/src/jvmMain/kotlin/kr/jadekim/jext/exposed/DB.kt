@@ -2,8 +2,11 @@ package kr.jadekim.jext.exposed
 
 import kotlinx.coroutines.asCoroutineDispatcher
 import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.DatabaseConfig
 import org.jetbrains.exposed.sql.Transaction
 import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
+import org.jetbrains.exposed.sql.vendors.DatabaseDialect
+import org.jetbrains.exposed.sql.vendors.MysqlDialect
 import java.util.concurrent.Executors
 import java.util.concurrent.SynchronousQueue
 import java.util.concurrent.ThreadPoolExecutor
@@ -19,15 +22,17 @@ interface ReadDB {
 
 fun ReadDB(
     dataSource: DataSource,
-    threadCount: Int = THREAD_COUNT_AUTO
-): ReadDB = DefaultReadDB(dataSource, threadCount)
+    threadCount: Int = THREAD_COUNT_AUTO,
+    databaseConfig: DatabaseConfig? = null,
+): ReadDB = DefaultReadDB(dataSource, threadCount, databaseConfig)
 
 open class DefaultReadDB(
     dataSource: DataSource,
-    threadCount: Int = THREAD_COUNT_AUTO
+    threadCount: Int = THREAD_COUNT_AUTO,
+    databaseConfig: DatabaseConfig? = null,
 ) : ReadDB {
 
-    protected val readDB = Database.connect(dataSource)
+    protected val readDB = Database.connect(dataSource, databaseConfig = databaseConfig)
     protected val dispatcher = if (threadCount == THREAD_COUNT_AUTO) {
         ThreadPoolExecutor(1, Integer.MAX_VALUE, 10, TimeUnit.MINUTES, SynchronousQueue()).asCoroutineDispatcher()
     } else {
@@ -48,14 +53,16 @@ interface CrudDB : ReadDB {
 fun CrudDB(
     dataSource: DataSource,
     readOnlyDataSource: DataSource = dataSource,
-    threadCount: Int = THREAD_COUNT_AUTO
-): CrudDB = DefaultCrudDB(dataSource, readOnlyDataSource, threadCount)
+    threadCount: Int = THREAD_COUNT_AUTO,
+    databaseConfig: DatabaseConfig? = null,
+): CrudDB = DefaultCrudDB(dataSource, readOnlyDataSource, threadCount, databaseConfig)
 
 open class DefaultCrudDB(
     dataSource: DataSource,
     readOnlyDataSource: DataSource = dataSource,
-    threadCount: Int = THREAD_COUNT_AUTO
-) : CrudDB, DefaultReadDB(readOnlyDataSource, threadCount) {
+    threadCount: Int = THREAD_COUNT_AUTO,
+    databaseConfig: DatabaseConfig? = null,
+) : CrudDB, DefaultReadDB(readOnlyDataSource, threadCount, databaseConfig) {
 
     protected val crudDB = Database.connect(dataSource)
 

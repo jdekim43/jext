@@ -1,6 +1,5 @@
 package kr.jadekim.server.http
 
-import kr.jadekim.common.extension.hasValue
 import kr.jadekim.logger.JLog
 import kr.jadekim.logger.JLogger
 import kr.jadekim.logger.context.GlobalLogContext
@@ -20,10 +19,11 @@ abstract class BaseHttpServer(
     protected val logger = logger ?: JLog.get(this.serverName)
 
     init {
-        val logKey = if (serverName.hasValue()) "server.$serverName" else "server"
-        GlobalLogContext[logKey] = mapOf(
-            "serviceHost" to serviceHost,
-            "servicePort" to servicePort,
+        GlobalLogContext["server"] = mapOf(
+            (serverName ?: "http-server") to mapOf(
+                "serviceHost" to serviceHost,
+                "servicePort" to servicePort,
+            )
         )
     }
 
