@@ -4,17 +4,22 @@ plugins {
 
 dependencies {
     val gsonVersion: String by project
+    val commonVersion: String by project
 
     api("com.google.code.gson:gson:$gsonVersion")
     implementation(kotlin("reflect"))
+
+    implementation("kr.jadekim:common-encoder:$commonVersion")
 }
 
 tasks {
+    val jvmTarget: String by project
+
     compileKotlin {
-        kotlinOptions.jvmTarget = "11"
+        kotlinOptions.jvmTarget = jvmTarget
     }
     compileTestKotlin {
-        kotlinOptions.jvmTarget = "11"
+        kotlinOptions.jvmTarget = jvmTarget
     }
     test {
         useJUnitPlatform()

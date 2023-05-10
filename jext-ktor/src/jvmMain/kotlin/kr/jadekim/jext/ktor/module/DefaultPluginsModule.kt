@@ -11,7 +11,7 @@ import io.ktor.server.plugins.forwardedheaders.*
 import io.ktor.util.*
 import io.ktor.util.date.*
 
-private val ATTRIBUTE_CACHE_OPTION: AttributeKey<CachingOptions> = AttributeKey("CachingHeader.max_age")
+private val ATTRIBUTE_CACHE_OPTION: AttributeKey<CachingOptions> = AttributeKey("CachingHeader.options")
 
 fun ApplicationCall.cacheOption(option: CacheControl? = null, expires: GMTDate? = null) {
     attributes.put(ATTRIBUTE_CACHE_OPTION, CachingOptions(option, expires))
@@ -19,11 +19,22 @@ fun ApplicationCall.cacheOption(option: CacheControl? = null, expires: GMTDate? 
 
 object DefaultFeatureModule : KtorModuleFactory<DefaultFeatureModule.Configuration> {
 
-    class Configuration : KtorModuleConfiguration
+    class Configuration : KtorModuleConfiguration {
+        var forHeaders: List<String> = listOf(
+            "CF-Connecting-IP",
+            "CLIENT_IP",
+            HttpHeaders.XForwardedFor,
+        )
+
+        var callIdConfig: CallIdConfig.() -> Unit = {
+            retrieveFromHeader("traceparent")
+        }
+    }
 
     override fun create(config: Configuration): KtorModule = ktorModule {
         install(XForwardedHeaders) {
-            forHeaders += "CF-Connecting-IP"
+            forHeaders.clear()
+            forHeaders.addAll(config.forHeaders)
         }
 
         install(DoubleReceive)
@@ -36,9 +47,7 @@ object DefaultFeatureModule : KtorModuleFactory<DefaultFeatureModule.Configurati
             }
         }
 
-        install(CallId) {
-            retrieveFromHeader("traceparent")
-        }
+        install(CallId, config.callIdConfig)
     }
 
     override fun createDefaultConfiguration(): Configuration = Configuration()

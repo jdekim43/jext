@@ -4,6 +4,7 @@ import kr.jadekim.logger.JLog
 import kr.jadekim.logger.JLogger
 import kr.jadekim.logger.context.GlobalLogContext
 import kotlin.time.Duration
+import kotlin.time.Duration.Companion.seconds
 import kotlin.time.ExperimentalTime
 
 @OptIn(ExperimentalTime::class)
@@ -40,7 +41,7 @@ abstract class BaseHttpServer(
         onStart()
     }
 
-    fun stop(timeout: Duration = Duration.seconds(30)) {
+    fun stop(timeout: Duration = 30.seconds) {
         logger.info("Request stop $serverName")
 
         onStop(timeout)

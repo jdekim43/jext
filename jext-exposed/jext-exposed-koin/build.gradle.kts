@@ -34,7 +34,14 @@ kotlin {
                 implementation(kotlin("test"))
             }
         }
-        val jvmMain by getting
+        val jvmMain by getting {
+            dependencies {
+                val awsSdkVersion: String by project
+
+                compileOnly("software.amazon.awssdk:rds:$awsSdkVersion")
+                compileOnly("software.amazon.awssdk:sts:$awsSdkVersion")
+            }
+        }
         val jvmTest by getting {
             dependencies {
                 val junitVersion: String by project

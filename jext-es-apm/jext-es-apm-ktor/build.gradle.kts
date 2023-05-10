@@ -6,17 +6,19 @@ dependencies {
     val jLoggerVersion: String by project
 
     implementation(project(":jext-es-apm"))
-    implementation(project(":jext-ktor"))
+    compileOnly(project(":jext-ktor"))
     compileOnly("kr.jadekim:j-logger:$jLoggerVersion")
     compileOnly("kr.jadekim:j-logger-coroutine:$jLoggerVersion")
 }
 
 tasks {
+    val jvmTarget: String by project
+
     compileKotlin {
-        kotlinOptions.jvmTarget = "11"
+        kotlinOptions.jvmTarget = jvmTarget
     }
     compileTestKotlin {
-        kotlinOptions.jvmTarget = "11"
+        kotlinOptions.jvmTarget = jvmTarget
     }
     test {
         useJUnitPlatform()

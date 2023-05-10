@@ -12,11 +12,13 @@ dependencies {
 }
 
 tasks {
+    val jvmTarget: String by project
+
     compileKotlin {
-        kotlinOptions.jvmTarget = "11"
+        kotlinOptions.jvmTarget = jvmTarget
     }
     compileTestKotlin {
-        kotlinOptions.jvmTarget = "11"
+        kotlinOptions.jvmTarget = jvmTarget
     }
     test {
         useJUnitPlatform()
