@@ -3,7 +3,7 @@ package kr.jadekim.jext.koin
 import org.koin.core.Koin
 import org.koin.core.KoinApplication
 import org.koin.core.context.KoinContext
-import org.koin.core.error.KoinAppAlreadyStartedException
+import org.koin.core.error.KoinApplicationAlreadyStartedException
 import org.koin.core.module.Module
 import org.koin.dsl.KoinAppDeclaration
 
@@ -20,7 +20,7 @@ class KoinHolder : KoinContext {
 
     private fun register(koinApplication: KoinApplication) {
         if (_koin != null) {
-            throw KoinAppAlreadyStartedException("A Koin Application has already been started")
+            throw KoinApplicationAlreadyStartedException("A Koin Application has already been started")
         }
         _koinApplication = koinApplication
         _koin = koinApplication.koin
@@ -45,12 +45,12 @@ class KoinHolder : KoinContext {
     }
 
 
-    override fun loadKoinModules(module: Module) = synchronized(this) {
-        get().loadModules(listOf(module))
+    override fun loadKoinModules(module: Module, createEagerInstances: Boolean) = synchronized(this) {
+        get().loadModules(listOf(module), createEagerInstances = createEagerInstances)
     }
 
-    override fun loadKoinModules(modules: List<Module>) = synchronized(this) {
-        get().loadModules(modules)
+    override fun loadKoinModules(modules: List<Module>, createEagerInstances: Boolean) = synchronized(this) {
+        get().loadModules(modules, createEagerInstances = createEagerInstances)
     }
 
     override fun unloadKoinModules(module: Module) = synchronized(this) {

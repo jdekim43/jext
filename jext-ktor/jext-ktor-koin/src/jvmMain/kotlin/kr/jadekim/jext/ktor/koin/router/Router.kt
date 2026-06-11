@@ -1,10 +1,7 @@
 package kr.jadekim.jext.ktor.koin.router
 
 import io.ktor.http.*
-import io.ktor.server.application.*
-import io.ktor.server.request.*
 import io.ktor.server.routing.*
-import io.ktor.util.pipeline.*
 import org.koin.core.Koin
 import org.koin.core.component.KoinComponent
 
@@ -13,13 +10,13 @@ abstract class AbstractRouter {
     protected lateinit var koin: Koin
 
     context(KoinComponent)
-            operator fun invoke(): Route.() -> Unit = {
+    operator fun invoke(): Route.() -> Unit = {
         koin = getKoin()
         configure()
     }
 
     context(KoinWrapper, Route)
-            operator fun invoke() {
+    operator fun invoke() {
         koin = _getKoin()
         configure()
     }
@@ -84,9 +81,4 @@ object RouterUtil {
             router()
         }
     }
-
-    inline fun <reified T> Route.handle(crossinline handler: suspend PipelineContext<Unit, ApplicationCall>.(T) -> Unit) =
-        handle {
-            handler(context.receive())
-        }
 }

@@ -3,11 +3,18 @@ package kr.jadekim.jext.ktor.module
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.cors.*
+import io.ktor.server.plugins.cors.routing.CORS
+import kotlin.collections.Set
+import kotlin.collections.emptySet
+import kotlin.collections.forEach
+import kotlin.collections.listOf
+import kotlin.collections.setOf
+import kotlin.collections.toSet
 import kotlin.time.Duration
 import kotlin.time.DurationUnit
 import kotlin.time.toDuration
 
-object CorsModule : KtorModuleFactory<CorsModule.Configuration> {
+object CorsModule : KtorModuleDefinition<CorsModule.Configuration> {
 
     val DEFAULT_ALLOW_HEADERS = setOf(
         HttpHeaders.Accept,
@@ -21,13 +28,12 @@ object CorsModule : KtorModuleFactory<CorsModule.Configuration> {
         var hosts: Set<String> = emptySet()
         var methods: Set<HttpMethod> = HttpMethod.DefaultMethods.toSet()
         var headers: Set<String> = DEFAULT_ALLOW_HEADERS
-        var headerPredicates: ((String) -> Boolean)? = null
-        var exposeHeaders: Set<String> = emptySet()
-        var allowCredentials: Boolean = true
         var maxAge: Duration = 3600.toDuration(DurationUnit.SECONDS)
+
+        var configure: CORSConfig.() -> Unit = {}
     }
 
-    override fun create(config: Configuration): KtorModule = ktorModule {
+    override fun createApplicationModule(config: Configuration): KtorApplicationModuleInstaller = KtorApplicationModuleInstaller {
         install(CORS) {
             if (config.hosts.isEmpty()) {
                 anyHost()
@@ -35,13 +41,12 @@ object CorsModule : KtorModuleFactory<CorsModule.Configuration> {
                 config.hosts.forEach { allowHost(it, listOf("https", "http")) }
             }
 
-            config.methods.forEach { allowMethod(it) }
-            config.headers.forEach { allowHeader(it) }
-            config.headerPredicates?.let { headerPredicates.add(it) }
-            config.exposeHeaders.forEach { exposeHeader(it) }
+            methods.addAll(config.methods)
+            headers.addAll(config.headers)
 
-            allowCredentials = config.allowCredentials
             maxAgeDuration = config.maxAge
+
+            config.configure(this)
         }
     }
 

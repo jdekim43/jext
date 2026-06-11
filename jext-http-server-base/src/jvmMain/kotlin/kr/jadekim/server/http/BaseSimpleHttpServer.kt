@@ -5,27 +5,33 @@ import com.sun.net.httpserver.HttpServer
 import java.io.PrintWriter
 import java.net.InetSocketAddress
 import kotlin.time.Duration
-import kotlin.time.ExperimentalTime
 
-abstract class BaseSimpleHttpServer(
-    serverName: String? = null,
-    serviceHost: String = "0.0.0.0",
-    servicePort: Int = 80,
-) : BaseHttpServer(serverName, serviceHost, servicePort) {
+abstract class BaseSimpleHttpServer(serverName: String? = null) : BaseHttpServer<BaseSimpleHttpServer.Options>(serverName) {
 
-    private val server = HttpServer.create(InetSocketAddress(serviceHost, servicePort), 0)
+    data class Options(
+        val host: String = "0.0.0.0",
+        val port: Int = 80,
+    )
 
-    override fun onStart() {
-        server.start()
+    private var server: HttpServer? = null
+
+    private val routes = mutableListOf<Pair<String, HttpExchange.() -> Unit>>()
+
+    override fun createDefaultOptions(): Options = Options()
+
+    override fun onStart(options: Options) {
+        this.server = HttpServer.create(InetSocketAddress(options.host, options.port), 0).apply {
+            routes.forEach { (path, block) -> createContext(path, block) }
+            start()
+        }
     }
 
-    @OptIn(ExperimentalTime::class)
     override fun onStop(timeout: Duration) {
-        server.stop(timeout.inWholeSeconds.toInt())
+        server?.stop(timeout.inWholeSeconds.toInt())
     }
 
     protected fun route(path: String, block: HttpExchange.() -> Unit) {
-        server.createContext(path, block)
+        routes.add(path to block)
     }
 
     protected fun HttpExchange.response(body: String, httpStatus: Int = 200, contentType: String = "text/plain") {

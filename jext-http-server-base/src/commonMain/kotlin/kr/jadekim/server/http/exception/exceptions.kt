@@ -30,6 +30,25 @@ open class HttpServerException(
     ) = ErrorResponse(code, getFriendlyMessage(language), data, meta)
 }
 
+open class RemoteHttpServerException(
+    code: String,
+    httpStatus: Int,
+    data: Any? = null,
+    cause: Throwable? = null,
+    message: String? = cause?.message,
+    level: ExceptionLevel = ExceptionLevel.ERROR,
+) : HttpServerException(code, httpStatus, data, cause, message, level) {
+
+    constructor(exception: HttpServerException) : this(
+        exception.code,
+        exception.httpStatus,
+        exception.data,
+        exception.cause,
+        exception.message,
+        exception.level,
+    )
+}
+
 class NotFoundException(
     cause: Throwable? = null,
 ) : HttpServerException(

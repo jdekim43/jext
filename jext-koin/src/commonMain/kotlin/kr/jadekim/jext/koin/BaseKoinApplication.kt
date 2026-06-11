@@ -10,8 +10,6 @@ import kr.jadekim.logger.JLog
 import kr.jadekim.logger.JLogger
 import kr.jadekim.logger.context.GlobalLogContext
 import kr.jadekim.logger.integration.koin.KoinLogger
-import kr.jadekim.logger.pipeline.LoggerNameShorter
-import kr.jadekim.logger.pipeline.StdOutPrinter
 import org.koin.core.Koin
 import org.koin.core.context.KoinContext
 import org.koin.core.module.Module
@@ -33,10 +31,6 @@ abstract class BaseKoinApplication(
     val koinContext: KoinContext = KoinPlatformTools.defaultContext(),
 ) {
 
-    open class EnvironmentOption {
-        var enableLoggerNameShorter: Boolean = true
-    }
-
     abstract val modules: List<Module>
 
     val applicationName: String = applicationName ?: this::class.simpleName ?: "KoinApplication"
@@ -45,9 +39,6 @@ abstract class BaseKoinApplication(
         private set
 
     var properties: Properties = properties ?: Properties()
-        protected set
-
-    lateinit var environmentOption: EnvironmentOption
         protected set
 
     val isGlobal: Boolean = koinContext == KoinPlatformTools.defaultContext()
@@ -69,8 +60,12 @@ abstract class BaseKoinApplication(
             "Init $applicationName with ${arguments.size} arguments"
         }
 
-        environmentOption = getEnvironmentOption(environment)
-        properties = Properties(loadPropertiesFromArguments(arguments) + properties)
+        val propertiesMap = properties +
+                System.getenv() +
+                loadPropertiesFromArguments(arguments) +
+                System.getProperties().mapKeys { it.toString() }.mapValues { it.toString() }
+
+        properties = Properties(propertiesMap)
 
         if (isGlobal) {
             GlobalLogContext["applicationName"] = this.applicationName
@@ -112,13 +107,6 @@ abstract class BaseKoinApplication(
     }
 
     protected open fun configureJLogger() {
-        JLog.pipeline = mutableListOf()
-
-        if (environmentOption.enableLoggerNameShorter) {
-            JLog.installPipe(LoggerNameShorter())
-        }
-
-        JLog.installPipe(StdOutPrinter())
     }
 
     protected open fun onInit() {
@@ -140,19 +128,6 @@ abstract class BaseKoinApplication(
 
     protected open fun onInitializedContainer() {
         //do nothing
-    }
-
-    protected open fun getEnvironmentOption(environment: IEnvironment?): EnvironmentOption {
-        val env = environment as? Environment ?: return EnvironmentOption()
-
-        return when (env) {
-            Environment.LOCAL -> EnvironmentOption().apply {
-                enableLoggerNameShorter = false
-            }
-            else -> EnvironmentOption().apply {
-                enableLoggerNameShorter = true
-            }
-        }
     }
 
     private operator fun <T> List<T>?.plus(data: List<T>?): List<T> {

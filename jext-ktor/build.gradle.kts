@@ -1,19 +1,10 @@
 plugins {
-    kotlin("multiplatform")
+    id("convention.kotlin-multiplatform")
+    id("convention.publish")
+    alias(kt.plugins.kotlinx.serialization)
 }
 
 kotlin {
-    jvm {
-        compilations.all {
-            val jvmTarget: String by rootProject
-
-            kotlinOptions.jvmTarget = jvmTarget
-        }
-        testRuns["test"].executionTask.configure {
-            useJUnitPlatform()
-        }
-    }
-
     sourceSets {
         all {
             languageSettings {
@@ -23,15 +14,18 @@ kotlin {
 
         val commonMain by getting {
             dependencies {
-                val ktorVersion: String by project
-                val commonVersion: String by project
-                val jLoggerVersion: String by project
+                val ktorVersion: String = kt.versions.ktor.get()
 
                 api(project(":jext-http-server-base"))
+                api(project(":jext-koin"))
 
+                api(libs.koin.core)
+                api(libs.koin.ktor)
+
+                api(libs.cohort)
+                api(libs.micrometer.prometheus)
                 api("io.ktor:ktor-server-core:$ktorVersion")
                 api("io.ktor:ktor-server-host-common:$ktorVersion")
-                api("io.ktor:ktor-server-netty:$ktorVersion")
                 api("io.ktor:ktor-server-auto-head-response:$ktorVersion")
                 api("io.ktor:ktor-server-default-headers:$ktorVersion")
                 api("io.ktor:ktor-server-double-receive:$ktorVersion")
@@ -40,33 +34,28 @@ kotlin {
                 api("io.ktor:ktor-server-caching-headers:$ktorVersion")
                 api("io.ktor:ktor-server-call-id:$ktorVersion")
                 api("io.ktor:ktor-server-cors:$ktorVersion")
-                api("io.ktor:ktor-server-content-negotiation:$ktorVersion")
-                implementation("io.ktor:ktor-serialization-gson:$ktorVersion")
+                api("io.ktor:ktor-server-compression:$ktorVersion")
+                api("io.ktor:ktor-server-metrics-micrometer:$ktorVersion")
 
+                compileOnly("io.ktor:ktor-server-content-negotiation:$ktorVersion")
+                compileOnly("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
+                compileOnly("io.ktor:ktor-serialization-gson:$ktorVersion")
+                compileOnly("io.ktor:ktor-serialization-jackson:$ktorVersion")
                 compileOnly("io.ktor:ktor-server-auth:$ktorVersion")
 
-                implementation("kr.jadekim:common-exception:$commonVersion")
-                implementation("kr.jadekim:j-logger:$jLoggerVersion")
-                implementation("kr.jadekim:j-logger-coroutine:$jLoggerVersion")
-                implementation("kr.jadekim:j-logger-ktor:$jLoggerVersion")
+                api(jade.common.exception)
+                implementation(jade.common.util)
+                implementation(jade.jLogger)
+                implementation(jade.jLogger.coroutine)
+                implementation(jade.jLogger.ktor)
+                implementation(jade.jLogger.koin)
             }
         }
-        val commonTest by getting {
-            dependencies {
-                implementation(kotlin("test-common"))
-                implementation(kotlin("test-annotations-common"))
-            }
-        }
-        val jvmMain by getting
-        val jvmTest by getting {
-            dependencies {
-                val junitVersion: String by project
 
-                implementation(kotlin("test-junit5"))
-                runtimeOnly("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
-                compileOnly("org.junit.jupiter:junit-jupiter-api:$junitVersion")
-                compileOnly("org.junit.jupiter:junit-jupiter-params:$junitVersion")
-            }
+        jvmMain.dependencies {
+            val ktorVersion: String = kt.versions.ktor.get()
+
+            api("io.ktor:ktor-server-netty:${ktorVersion}")
         }
     }
 }

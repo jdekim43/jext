@@ -5,7 +5,7 @@ import io.ktor.http.content.*
 import io.ktor.server.application.*
 import io.ktor.server.plugins.autohead.*
 import io.ktor.server.plugins.cachingheaders.*
-import io.ktor.server.plugins.callid.*
+import io.ktor.server.plugins.compression.*
 import io.ktor.server.plugins.doublereceive.*
 import io.ktor.server.plugins.forwardedheaders.*
 import io.ktor.util.*
@@ -17,24 +17,26 @@ fun ApplicationCall.cacheOption(option: CacheControl? = null, expires: GMTDate? 
     attributes.put(ATTRIBUTE_CACHE_OPTION, CachingOptions(option, expires))
 }
 
-object DefaultFeatureModule : KtorModuleFactory<DefaultFeatureModule.Configuration> {
+object DefaultFeatureModule : KtorModuleDefinition<DefaultFeatureModule.Configuration> {
 
     class Configuration : KtorModuleConfiguration {
-        var forHeaders: List<String> = listOf(
+        var xForwardedHeaders: List<String> = listOf(
             "CF-Connecting-IP",
             "CLIENT_IP",
             HttpHeaders.XForwardedFor,
         )
 
-        var callIdConfig: CallIdConfig.() -> Unit = {
-            retrieveFromHeader("traceparent")
-        }
+        var cachingOptions: ((ApplicationCall, OutgoingContent) -> CachingOptions?)? = null
+
+        var enableCompression: Boolean = true
     }
 
-    override fun create(config: Configuration): KtorModule = ktorModule {
-        install(XForwardedHeaders) {
-            forHeaders.clear()
-            forHeaders.addAll(config.forHeaders)
+    override fun createApplicationModule(config: Configuration): KtorApplicationModuleInstaller = KtorApplicationModuleInstaller {
+        if (config.xForwardedHeaders.isNotEmpty()) {
+            install(XForwardedHeaders) {
+                forHeaders.clear()
+                forHeaders.addAll(config.xForwardedHeaders)
+            }
         }
 
         install(DoubleReceive)
@@ -42,12 +44,14 @@ object DefaultFeatureModule : KtorModuleFactory<DefaultFeatureModule.Configurati
         install(AutoHeadResponse)
 
         install(CachingHeaders) {
-            options { call, _ ->
-                call.attributes.getOrNull(ATTRIBUTE_CACHE_OPTION)
+            options { call, content ->
+                call.attributes.getOrNull(ATTRIBUTE_CACHE_OPTION) ?: config.cachingOptions?.invoke(call, content)
             }
         }
 
-        install(CallId, config.callIdConfig)
+        if (config.enableCompression) {
+            install(Compression)
+        }
     }
 
     override fun createDefaultConfiguration(): Configuration = Configuration()

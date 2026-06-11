@@ -5,151 +5,116 @@ import io.ktor.server.logging.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import io.ktor.util.*
-import io.ktor.util.pipeline.*
 import io.opentracing.Span
 import io.opentracing.Tracer
 import io.opentracing.propagation.Format
 import io.opentracing.util.GlobalTracer
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import kr.jadekim.jext.apm.datadog.*
 import kr.jadekim.jext.apm.datadog.ktor.adapter.asTextMap
-import kr.jadekim.jext.ktor.module.KtorModule
+import kr.jadekim.jext.ktor.hook.PhaseHook
+import kr.jadekim.jext.ktor.module.KtorApplicationModuleInstaller
 import kr.jadekim.jext.ktor.module.KtorModuleConfiguration
-import kr.jadekim.jext.ktor.module.KtorModuleFactory
-import kr.jadekim.jext.ktor.module.ktorModule
-import kotlin.coroutines.CoroutineContext
+import kr.jadekim.jext.ktor.module.KtorModuleDefinition
+import kotlin.coroutines.coroutineContext
 
-object DatadogApmServerModule : KtorModuleFactory<DatadogApmServerModule.Configuration> {
-
-    private val defaultConfiguration = DatadogApmServerPlugin.Configuration()
+object DatadogApmServerModule : KtorModuleDefinition<DatadogApmServerModule.Configuration> {
 
     class Configuration : KtorModuleConfiguration {
-        var getSpanName: (ApplicationCall) -> String = defaultConfiguration.getSpanName
-        var setupSpan: Span.(ApplicationCall, CoroutineContext) -> Unit = defaultConfiguration.setupSpan
-        var shouldTrace: (ApplicationCall) -> Boolean = defaultConfiguration.shouldTrace
-    }
-
-    override fun create(config: Configuration): KtorModule = ktorModule {
-        install(DatadogApmServerPlugin) {
-            getSpanName = config.getSpanName
-            setupSpan = config.setupSpan
-            shouldTrace = config.shouldTrace
-        }
-    }
-
-    override fun createDefaultConfiguration() = Configuration()
-}
-
-class DatadogApmServerPlugin private constructor(configuration: Configuration) {
-
-    class Configuration {
         var tracer: Tracer = GlobalTracer.get()
-        var getSpanName: (ApplicationCall) -> String = { it.attributes.getOrNull(ATTRIBUTE_ROUTE) ?: it.request.path() }
-        var setupSpan: Span.(ApplicationCall, CoroutineContext) -> Unit = { _, coroutineContext ->
-            if (isInstalledJLogger) {
-                coroutineContext[kr.jadekim.logger.coroutine.context.CoroutineLogContext]?.forEach { key, value ->
-                    when (value) {
-                        is Boolean -> setTag(key, value)
-                        is Number -> setTag(key, value)
-                        else -> setTag(key, value.toString())
-                    }
+        var getSpanName: (ApplicationCall) -> String = {
+            when (it) {
+                is RoutingCall -> it.route.toString()
+                is RoutingPipelineCall -> it.route.toString()
+                else -> it.request.path()
+            }
+        }
+        var finalizeSpan: Span.(ApplicationCall, Map<String, Any?>) -> Unit = { _, logContext ->
+            logContext.forEach { (key, value) ->
+                when (value) {
+                    is Boolean -> setTag(key, value)
+                    is Number -> setTag(key, value)
+                    else -> setTag(key, value.toString())
                 }
             }
         }
         var shouldTrace: (ApplicationCall) -> Boolean = { true }
     }
 
-    val tracer = configuration.tracer
-    val getSpanName = configuration.getSpanName
-    val setupSpan = configuration.setupSpan
-    val shouldTrace = configuration.shouldTrace
-
-    private suspend fun PipelineContext<Unit, ApplicationCall>.injectRootSpan() {
-        val span = context.request.extractSpan(tracer, context.request.toLogString())
-        var apmCoroutineContext = coroutineContext
-
-        if (isInstalledJLogger) {
-            val logContext = apmCoroutineContext[kr.jadekim.logger.coroutine.context.CoroutineLogContext]
-                ?: kr.jadekim.logger.coroutine.context.CoroutineLogContext()
-
-            logContext["tracing"] = mapOf(
-                "traceId" to span.context.toTraceId(),
-                "spanId" to span.context.toSpanId(),
-                "parentIdInHeader" to context.request.headers["x-datadog-parent-id"],
-                "traceIdInHeader" to context.request.headers["x-datadog-trace-id"],
-            )
-
-            apmCoroutineContext += logContext
-        }
-
-        span.setupSpan(context, apmCoroutineContext)
-
-        withContext(apmCoroutineContext) {
-            withApm(tracer, getSpan = { span }) {
-                proceed()
-            }
+    override fun createApplicationModule(config: Configuration): KtorApplicationModuleInstaller = KtorApplicationModuleInstaller {
+        install(Plugin) {
+            tracer = config.tracer
+            getSpanName = config.getSpanName
+            finalizeSpan = config.finalizeSpan
+            shouldTrace = config.shouldTrace
         }
     }
 
-    private fun PipelineContext<Unit, ApplicationCall>.injectSpanToHeaders() {
-        (coroutineContext.datadogApmContext.span)?.let {
-            it.setOperationName(getSpanName(context))
-            context.response.injectSpan(tracer, it)
+    override fun createDefaultConfiguration() = Configuration()
+
+    val Plugin = createRouteScopedPlugin("DatadogApmServerPlugin", { createDefaultConfiguration() }) {
+
+        fun ApplicationRequest.extractSpan(tracer: Tracer, spanName: String): Span {
+            return tracer.span(spanName) {
+                this.extractSpan(headers.asTextMap(), Format.Builtin.HTTP_HEADERS, tracer)
+            }
         }
-    }
 
-    private fun ApplicationRequest.extractSpan(tracer: Tracer, spanName: String): Span {
-        return tracer.span(spanName) {
-            this.extractSpan(headers.asTextMap(), Format.Builtin.HTTP_HEADERS, tracer)
+        fun ApplicationResponse.injectSpan(tracer: Tracer, span: Span) {
+            if (!this.isCommitted) {
+                tracer.inject(span.context, Format.Builtin.HTTP_HEADERS, headers.asTextMap())
+            }
         }
-    }
 
-    private fun ApplicationResponse.injectSpan(tracer: Tracer, span: Span) {
-        if (!this.isCommitted) {
-            tracer.inject(span.context, Format.Builtin.HTTP_HEADERS, headers.asTextMap())
-        }
-    }
-
-    companion object Plugin : BaseApplicationPlugin<ApplicationCallPipeline, Configuration, DatadogApmServerPlugin> {
-
-        override val key = AttributeKey<DatadogApmServerPlugin>("DatadogApmServerPlugin")
-
-        val ATTRIBUTE_ROUTE = AttributeKey<String>("DatadogApmServerPlugin.route")
-
-        override fun install(
-            pipeline: ApplicationCallPipeline,
-            configure: Configuration.() -> Unit
-        ): DatadogApmServerPlugin {
-            val plugin = DatadogApmServerPlugin(Configuration().apply(configure))
-
-            pipeline.environment!!.monitor.subscribe(Routing.RoutingCallStarted) {
-                it.attributes.put(ATTRIBUTE_ROUTE, it.route.toString())
+        on(PhaseHook(ApplicationCallPipeline.Monitoring)) {
+            if (!pluginConfig.shouldTrace(call)) {
+                return@on
             }
 
-            pipeline.intercept(ApplicationCallPipeline.Monitoring) {
-                if (!plugin.shouldTrace(context)) {
-                    return@intercept
-                }
+            val span = call.request.extractSpan(pluginConfig.tracer, call.request.toLogString())
 
-                with(plugin) {
-                    injectRootSpan()
-                }
+            var apmCoroutineContext = currentCoroutineContext()
+            var logContext = emptyMap<String, Any?>()
+
+            if (isInstalledJLogger) {
+                val coroutineLogContext =
+                    kr.jadekim.logger.coroutine.context.CoroutineLogContext.get(apmCoroutineContext)
+
+                coroutineLogContext["tracing"] = mapOf(
+                    "traceId" to span.context.toTraceId(),
+                    "spanId" to span.context.toSpanId(),
+                    "parentIdInHeader" to call.request.headers["x-datadog-parent-id"],
+                    "traceIdInHeader" to call.request.headers["x-datadog-trace-id"],
+                )
+
+                apmCoroutineContext += coroutineLogContext
+                logContext = coroutineLogContext
             }
 
-            pipeline.intercept(ApplicationCallPipeline.Call) {
-                if (!plugin.shouldTrace(context)) {
-                    return@intercept
-                }
+            span.setOperationName(pluginConfig.getSpanName(call))
 
-                with(plugin) {
-                    injectSpanToHeaders()
-                }
+            withContext(apmCoroutineContext) {
+                withApm(pluginConfig.tracer, getSpan = { span }) {
+                    try {
+                        proceed()
+                    } finally {
+                        pluginConfig.finalizeSpan(span, call, logContext)
 
-                proceed()
+                        span.finish()
+                    }
+                }
+            }
+        }
+
+        on(PhaseHook(ApplicationCallPipeline.Call)) {
+            if (!pluginConfig.shouldTrace(call)) {
+                return@on
             }
 
-            return plugin
+            (coroutineContext.datadogApmContext.span)?.let {
+                call.response.injectSpan(pluginConfig.tracer, it)
+            }
         }
     }
 }

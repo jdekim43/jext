@@ -1,9 +1,9 @@
 package kr.jadekim.jext.exposed.dbms
 
-import org.jetbrains.exposed.sql.Expression
-import org.jetbrains.exposed.sql.Function
-import org.jetbrains.exposed.sql.QueryBuilder
-import org.jetbrains.exposed.sql.VarCharColumnType
+import org.jetbrains.exposed.v1.core.Expression
+import org.jetbrains.exposed.v1.core.Function
+import org.jetbrains.exposed.v1.core.QueryBuilder
+import org.jetbrains.exposed.v1.core.VarCharColumnType
 
 class Concat(val expr: Expression<*>, val str: String) : Function<String>(VarCharColumnType()) {
 

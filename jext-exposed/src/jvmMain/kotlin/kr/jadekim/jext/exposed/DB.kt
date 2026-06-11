@@ -1,48 +1,44 @@
 package kr.jadekim.jext.exposed
 
-import kotlinx.coroutines.asCoroutineDispatcher
-import org.jetbrains.exposed.sql.Database
-import org.jetbrains.exposed.sql.DatabaseConfig
-import org.jetbrains.exposed.sql.Transaction
-import org.jetbrains.exposed.sql.transactions.experimental.newSuspendedTransaction
-import org.jetbrains.exposed.sql.vendors.DatabaseDialect
-import org.jetbrains.exposed.sql.vendors.MysqlDialect
-import java.util.concurrent.Executors
-import java.util.concurrent.SynchronousQueue
-import java.util.concurrent.ThreadPoolExecutor
-import java.util.concurrent.TimeUnit
+import kotlinx.coroutines.CoroutineName
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import org.jetbrains.exposed.v1.core.DatabaseConfig
+import org.jetbrains.exposed.v1.core.Transaction
+import org.jetbrains.exposed.v1.jdbc.Database
+import org.jetbrains.exposed.v1.jdbc.transactions.suspendTransaction
 import javax.sql.DataSource
-
-const val THREAD_COUNT_AUTO = -1
+import kotlin.coroutines.CoroutineContext
 
 interface ReadDB {
+
+    val database: Database
 
     suspend fun <T> read(transactionIsolation: Int? = null, statement: suspend Transaction.() -> T): T
 }
 
 fun ReadDB(
     dataSource: DataSource,
-    threadCount: Int = THREAD_COUNT_AUTO,
+    name: String? = null,
+    context: CoroutineContext = Dispatchers.IO + CoroutineName("exposed-read${if (name == null) "" else "/$name"}"),
     databaseConfig: DatabaseConfig? = null,
-): ReadDB = DefaultReadDB(dataSource, threadCount, databaseConfig)
+): ReadDB = DefaultReadDB(dataSource, name, context, databaseConfig)
 
 open class DefaultReadDB(
     dataSource: DataSource,
-    threadCount: Int = THREAD_COUNT_AUTO,
-    databaseConfig: DatabaseConfig? = null,
+    val name: String?,
+    private val context: CoroutineContext,
+    databaseConfig: DatabaseConfig?,
 ) : ReadDB {
 
-    protected val readDB = Database.connect(dataSource, databaseConfig = databaseConfig)
-    protected val dispatcher = if (threadCount == THREAD_COUNT_AUTO) {
-        ThreadPoolExecutor(1, Integer.MAX_VALUE, 10, TimeUnit.MINUTES, SynchronousQueue()).asCoroutineDispatcher()
-    } else {
-        Executors.newFixedThreadPool(threadCount).asCoroutineDispatcher()
-    }
+    override val database = Database.connect(dataSource, databaseConfig = databaseConfig)
 
     override suspend fun <T> read(
         transactionIsolation: Int?,
-        statement: suspend Transaction.() -> T
-    ): T = newSuspendedTransaction(dispatcher, readDB, transactionIsolation, statement)
+        statement: suspend Transaction.() -> T,
+    ): T = withContext(context) {
+        suspendTransaction(database, transactionIsolation, true, statement)
+    }
 }
 
 interface CrudDB : ReadDB {
@@ -53,23 +49,25 @@ interface CrudDB : ReadDB {
 fun CrudDB(
     dataSource: DataSource,
     readOnlyDataSource: DataSource = dataSource,
-    threadCount: Int = THREAD_COUNT_AUTO,
+    name: String? = null,
+    context: CoroutineContext = Dispatchers.IO + CoroutineName("exposed-crud${if (name == null) "" else "/$name"}"),
     databaseConfig: DatabaseConfig? = null,
-): CrudDB = DefaultCrudDB(dataSource, readOnlyDataSource, threadCount, databaseConfig)
+): CrudDB = DefaultCrudDB(dataSource, readOnlyDataSource, name, context, databaseConfig)
 
 open class DefaultCrudDB(
     dataSource: DataSource,
     readOnlyDataSource: DataSource = dataSource,
-    threadCount: Int = THREAD_COUNT_AUTO,
+    name: String?,
+    private val context: CoroutineContext,
     databaseConfig: DatabaseConfig? = null,
-) : CrudDB, DefaultReadDB(readOnlyDataSource, threadCount, databaseConfig) {
-
-    protected val crudDB = Database.connect(dataSource)
+) : CrudDB, DefaultReadDB(readOnlyDataSource, name, context, databaseConfig) {
 
     override suspend fun <T> execute(
         transactionIsolation: Int?,
-        statement: suspend Transaction.() -> T
-    ): T = newSuspendedTransaction(dispatcher, crudDB, transactionIsolation, statement)
+        statement: suspend Transaction.() -> T,
+    ): T = withContext(context) {
+        suspendTransaction(database, transactionIsolation, false, statement)
+    }
 }
 
 typealias DB = CrudDB

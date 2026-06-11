@@ -5,116 +5,90 @@ import co.elastic.apm.api.Transaction
 import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.routing.*
-import io.ktor.util.*
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.withContext
 import kr.jadekim.jext.apm.es.EsApmContext
-import kr.jadekim.jext.ktor.module.KtorModule
+import kr.jadekim.jext.ktor.hook.PhaseHook
+import kr.jadekim.jext.ktor.module.KtorApplicationModuleInstaller
 import kr.jadekim.jext.ktor.module.KtorModuleConfiguration
-import kr.jadekim.jext.ktor.module.KtorModuleFactory
-import kr.jadekim.jext.ktor.module.ktorModule
-import kotlin.coroutines.CoroutineContext
+import kr.jadekim.jext.ktor.module.KtorModuleDefinition
 
-object EsApmServerModule : KtorModuleFactory<EsApmServerModule.Configuration> {
-
-    private val defaultConfiguration = EsApmServerPlugin.Configuration()
+object EsApmServerModule : KtorModuleDefinition<EsApmServerModule.Configuration> {
 
     class Configuration : KtorModuleConfiguration {
-        var transactionName: (ApplicationCall) -> String = defaultConfiguration.transactionName
-        var setupTransaction: Transaction.(ApplicationCall, CoroutineContext) -> Unit =
-            defaultConfiguration.setupTransaction
-        var shouldTrace: (ApplicationCall) -> Boolean = defaultConfiguration.shouldTrace
-    }
-
-    override fun create(config: Configuration): KtorModule = ktorModule {
-        install(EsApmServerPlugin) {
-            transactionName = config.transactionName
-            setupTransaction = config.setupTransaction
-            shouldTrace = config.shouldTrace
+        var transactionName: (ApplicationCall) -> String = {
+            when (it) {
+                is RoutingCall -> it.route.toString()
+                is RoutingPipelineCall -> it.route.toString()
+                else -> it.request.path()
+            }
         }
-    }
-
-    override fun createDefaultConfiguration() = Configuration()
-}
-
-class EsApmServerPlugin private constructor(configuration: Configuration) {
-
-    class Configuration {
-        var transactionName: (ApplicationCall) -> String = { it.attributes[ATTRIBUTE_ROUTE] }
-        var setupTransaction: Transaction.(ApplicationCall, CoroutineContext) -> Unit = { _, coroutineContext ->
-            if (isInstalledJLogger) {
-                coroutineContext[kr.jadekim.logger.coroutine.context.CoroutineLogContext]?.forEach { key, value ->
-                    when (value) {
-                        is Boolean -> addCustomContext(key, value)
-                        is Number -> addCustomContext(key, value)
-                        else -> addCustomContext(key, value.toString())
-                    }
+        var finalizeTransaction: Transaction.(ApplicationCall, Map<String, Any?>) -> Unit = { _, logContext ->
+            logContext.forEach { (key, value) ->
+                when (value) {
+                    is Boolean -> addCustomContext(key, value)
+                    is Number -> addCustomContext(key, value)
+                    else -> addCustomContext(key, value.toString())
                 }
             }
         }
         var shouldTrace: (ApplicationCall) -> Boolean = { true }
     }
 
-    val transactionName = configuration.transactionName
-    val setupTransaction = configuration.setupTransaction
-    val shouldTrace = configuration.shouldTrace
+    override fun createApplicationModule(config: Configuration): KtorApplicationModuleInstaller = KtorApplicationModuleInstaller {
+        install(Plugin) {
+            transactionName = config.transactionName
+            finalizeTransaction = config.finalizeTransaction
+            shouldTrace = config.shouldTrace
+        }
+    }
 
-    companion object Plugin : BaseApplicationPlugin<ApplicationCallPipeline, Configuration, EsApmServerPlugin> {
+    override fun createDefaultConfiguration() = Configuration()
 
-        override val key = AttributeKey<EsApmServerPlugin>("EsApmIntegration")
-
-        val ATTRIBUTE_ROUTE = AttributeKey<String>("EsApmIntegration.route")
-
-        override fun install(
-            pipeline: ApplicationCallPipeline,
-            configure: Configuration.() -> Unit
-        ): EsApmServerPlugin {
-            val plugin = EsApmServerPlugin(Configuration().apply(configure))
-
-            pipeline.environment!!.monitor.subscribe(Routing.RoutingCallStarted) {
-                it.attributes.put(ATTRIBUTE_ROUTE, it.route.toString())
+    val Plugin = createRouteScopedPlugin(
+        "EsApmIntegration",
+        { Configuration() },
+    ) {
+        on(PhaseHook(ApplicationCallPipeline.Monitoring)) {
+            if (!pluginConfig.shouldTrace(call)) {
+                return@on
             }
 
-            pipeline.intercept(ApplicationCallPipeline.Monitoring) {
-                if (!plugin.shouldTrace(context)) {
-                    return@intercept
-                }
+            val transaction = ElasticApm.startTransactionWithRemoteParent { call.request.header(it) }
 
-                val transaction = ElasticApm.startTransactionWithRemoteParent { context.request.header(it) }
+            var apmCoroutineContext = currentCoroutineContext()
+            var logContext = emptyMap<String, Any?>()
 
-                var apmCoroutineContext = coroutineContext
+            if (isInstalledJLogger) {
+                val coroutineLogContext =
+                    kr.jadekim.logger.coroutine.context.CoroutineLogContext.get(apmCoroutineContext)
 
-                if (isInstalledJLogger) {
-                    val logContext = apmCoroutineContext[kr.jadekim.logger.coroutine.context.CoroutineLogContext]
-                        ?: kr.jadekim.logger.coroutine.context.CoroutineLogContext()
+                coroutineLogContext["tracing"] = mapOf(
+                    "traceId" to transaction.traceId,
+                    "transactionId" to transaction.id,
+                )
 
-                    logContext["tracing"] = mapOf(
-                        "traceId" to transaction.traceId,
-                        "transactionId" to transaction.id,
-                    )
-
-                    apmCoroutineContext += logContext
-                }
-
-                transaction.setFrameworkName("ktor")
-                apmCoroutineContext += EsApmContext(transaction)
-
-                try {
-                    withContext(apmCoroutineContext) {
-                        proceed()
-                    }
-                } catch (e: Throwable) {
-                    transaction.captureException(e)
-
-                    throw e
-                } finally {
-                    transaction.setName(plugin.transactionName(context))
-                    plugin.setupTransaction(transaction, context, apmCoroutineContext)
-
-                    transaction.end()
-                }
+                apmCoroutineContext += coroutineLogContext
+                logContext = coroutineLogContext
             }
 
-            return plugin
+            transaction.setName(pluginConfig.transactionName(call))
+            transaction.setFrameworkName("ktor")
+            apmCoroutineContext += EsApmContext(transaction)
+
+            try {
+                withContext(apmCoroutineContext) {
+                    proceed()
+                }
+            } catch (e: Throwable) {
+                transaction.captureException(e)
+
+                throw e
+            } finally {
+                pluginConfig.finalizeTransaction(transaction, call, logContext)
+
+                transaction.end()
+            }
         }
     }
 }

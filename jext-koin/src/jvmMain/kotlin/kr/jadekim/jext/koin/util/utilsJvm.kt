@@ -1,9 +1,9 @@
 package kr.jadekim.jext.koin.util
 
+import kr.jadekim.common.util.load
+import kr.jadekim.common.util.loadFromFileTree
 import kr.jadekim.jext.koin.BaseKoinApplication
-import kr.jadekim.common.util.loadProperties
 import java.io.File
-import java.io.InputStream
 import java.util.*
 
 private val CLASSPATH_PREFIX = "classpath:"
@@ -11,7 +11,7 @@ private val CLASSPATH_PREFIX = "classpath:"
 actual fun shutdownHook(block: () -> Unit) = kr.jadekim.common.util.shutdownHook(block)
 
 actual fun loadPropertiesFromArguments(arguments: Map<String, List<String>>): Map<String, String> {
-    val externalPropertyFiles = mutableListOf<InputStream>()
+    val properties = Properties()
 
     arguments.filterKeys { it == "config" || it == "c" }
         .flatMap { it.value }
@@ -23,11 +23,12 @@ actual fun loadPropertiesFromArguments(arguments: Map<String, List<String>>): Ma
                 File(it).inputStream()
             }
         }
-        .let { externalPropertyFiles.addAll(it) }
+        .let(properties::load)
 
-    val properties = Properties()
-
-    loadProperties(externalPropertyFiles, properties)
+    arguments.filterKeys { it == "config-tree" || it == "t" }
+        .flatMap { it.value }
+        .map { File(it) }
+        .forEach(properties::loadFromFileTree)
 
     return properties.asIterable().associate { it.key.toString() to it.value.toString() }
 }

@@ -55,7 +55,7 @@ suspend fun <T> withApm(
 ): T {
     val span = tracer.getSpan()
 
-    return withContext(DatadogApmContext(tracer, span)) {
+    return withContext(coroutineContext + DatadogApmContext(tracer, span)) {
         span?.addOnJobCompletion()
         block()
     }

@@ -1,0 +1,14 @@
+[versions]
+jLogger = "2.2.0-beta1"
+kotlinCommon = "3.0.0-beta4"
+
+[libraries]
+jLogger = { module = "kr.jadekim:j-logger", version.ref = "jLogger" }
+jLogger-coroutine = { module = "kr.jadekim:j-logger-coroutine", version.ref = "jLogger" }
+jLogger-koin = { module = "kr.jadekim:j-logger-koin", version.ref = "jLogger" }
+jLogger-ktor = { module = "kr.jadekim:j-logger-ktor", version.ref = "jLogger" }
+common-encoder = { module = "kr.jadekim:common-encoder", version.ref = "kotlinCommon" }
+common-exception = { module = "kr.jadekim:common-exception", version.ref = "kotlinCommon" }
+common-util = { module = "kr.jadekim:common-util", version.ref = "kotlinCommon" }
+
+[plugins]

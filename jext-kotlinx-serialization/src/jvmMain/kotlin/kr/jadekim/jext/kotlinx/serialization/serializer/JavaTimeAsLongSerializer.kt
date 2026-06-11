@@ -11,15 +11,16 @@ import kotlinx.serialization.modules.contextual
 import java.time.*
 import java.util.*
 
-val DateAsLongSerializerModule = SerializersModule {
-    contextual(DateAsLongSerializer)
-    contextual(LocalDateTimeAsLongSerializer)
-    contextual(OffsetDateTimeAsLongSerializer)
-    contextual(ZonedDateTimeAsLongSerializer)
-    contextual(DurationAsLongSerializer)
+val JavaTimeAsLongSerializerModule = SerializersModule {
+    contextual(JavaDateAsLongSerializer)
+    contextual(JavaInstantAsLongSerializer)
+    contextual(JavaLocalDateTimeAsLongSerializer)
+    contextual(JavaOffsetDateTimeAsLongSerializer)
+    contextual(JavaZonedDateTimeAsLongSerializer)
+    contextual(JavaDurationAsLongSerializer)
 }
 
-object DateAsLongSerializer : KSerializer<Date> {
+object JavaDateAsLongSerializer : KSerializer<Date> {
 
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("DateAsLong", PrimitiveKind.LONG)
 
@@ -28,7 +29,7 @@ object DateAsLongSerializer : KSerializer<Date> {
     override fun deserialize(decoder: Decoder): Date = Date(decoder.decodeLong())
 }
 
-object LocalDateTimeAsLongSerializer : KSerializer<LocalDateTime> {
+object JavaLocalDateTimeAsLongSerializer : KSerializer<LocalDateTime> {
 
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("LocalDateTimeAsLong", PrimitiveKind.LONG)
 
@@ -43,7 +44,7 @@ object LocalDateTimeAsLongSerializer : KSerializer<LocalDateTime> {
     }
 }
 
-object OffsetDateTimeAsLongSerializer : KSerializer<OffsetDateTime> {
+object JavaOffsetDateTimeAsLongSerializer : KSerializer<OffsetDateTime> {
 
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("OffsetDateTimeAsLong", PrimitiveKind.LONG)
 
@@ -58,7 +59,7 @@ object OffsetDateTimeAsLongSerializer : KSerializer<OffsetDateTime> {
     }
 }
 
-object ZonedDateTimeAsLongSerializer : KSerializer<ZonedDateTime> {
+object JavaZonedDateTimeAsLongSerializer : KSerializer<ZonedDateTime> {
 
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("ZonedDateTimeAsLong", PrimitiveKind.LONG)
 
@@ -73,7 +74,22 @@ object ZonedDateTimeAsLongSerializer : KSerializer<ZonedDateTime> {
     }
 }
 
-object DurationAsLongSerializer : KSerializer<Duration> {
+object JavaInstantAsLongSerializer : KSerializer<Instant> {
+
+    override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("InstantAsLong", PrimitiveKind.LONG)
+
+    override fun serialize(encoder: Encoder, value: Instant) {
+        encoder.encodeLong(value.toEpochMilli())
+    }
+
+    override fun deserialize(decoder: Decoder): Instant {
+        val value = decoder.decodeLong()
+
+        return Instant.ofEpochMilli(value)
+    }
+}
+
+object JavaDurationAsLongSerializer : KSerializer<Duration> {
 
     override val descriptor: SerialDescriptor = PrimitiveSerialDescriptor("DurationAsLong", PrimitiveKind.LONG)
 

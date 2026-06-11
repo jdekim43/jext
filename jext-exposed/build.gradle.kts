@@ -1,52 +1,26 @@
 plugins {
-    kotlin("multiplatform")
-    id("org.jetbrains.dokka")
+    id("convention.kotlin-multiplatform")
+    id("convention.publish")
 }
 
 kotlin {
-    jvm {
-        compilations.all {
-            val jvmTarget: String by rootProject
-
-            kotlinOptions.jvmTarget = jvmTarget
-        }
-        testRuns["test"].executionTask.configure {
-            useJUnitPlatform()
-        }
-    }
-
     sourceSets {
         val commonMain by getting {
             dependencies {
-                val exposedVersion: String by project
-                val kotlinxCoroutineVersion: String by project
+                api(kt.exposed)
+                api(kt.exposed.json)
+                api(kt.exposed.kotlin.datetime)
 
-                api("org.jetbrains.exposed:exposed-core:$exposedVersion")
+                implementation(kt.kotlinx.coroutine)
 
-                implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlinxCoroutineVersion")
-            }
-        }
-        val commonTest by getting {
-            dependencies {
-                implementation(kotlin("test"))
+                compileOnly(jade.common.util)
             }
         }
         val jvmMain by getting {
             dependencies {
-                val exposedVersion: String by project
-
-                api("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
-                api("org.jetbrains.exposed:exposed-java-time:$exposedVersion")
-            }
-        }
-        val jvmTest by getting {
-            dependencies {
-                val junitVersion: String by project
-
-                implementation(kotlin("test-junit5"))
-                runtimeOnly("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
-                compileOnly("org.junit.jupiter:junit-jupiter-api:$junitVersion")
-                compileOnly("org.junit.jupiter:junit-jupiter-params:$junitVersion")
+                api(kt.exposed.jdbc)
+                api(kt.exposed.javatime)
+                api(kt.exposed.migration.jdbc)
             }
         }
     }

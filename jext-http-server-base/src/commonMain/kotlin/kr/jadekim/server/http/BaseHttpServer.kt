@@ -5,40 +5,34 @@ import kr.jadekim.logger.JLogger
 import kr.jadekim.logger.context.GlobalLogContext
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.seconds
-import kotlin.time.ExperimentalTime
 
-@OptIn(ExperimentalTime::class)
-abstract class BaseHttpServer(
+abstract class BaseHttpServer<O>(
     serverName: String? = null,
-    val serviceHost: String = "0.0.0.0",
-    val servicePort: Int = 80,
     logger: JLogger? = null,
 ) {
 
-    val serverName = serverName ?: this::class.simpleName ?: "HttpServer"
+    val serverName = serverName ?: this::class.simpleName ?: "http-server"
 
     protected val logger = logger ?: JLog.get(this.serverName)
 
-    init {
-        GlobalLogContext["server"] = mapOf(
-            (serverName ?: "http-server") to mapOf(
-                "serviceHost" to serviceHost,
-                "servicePort" to servicePort,
-            )
-        )
-    }
+    abstract fun createDefaultOptions(): O
 
-    protected abstract fun onStart()
+    protected abstract fun onStart(options: O)
 
     protected abstract fun onStop(timeout: Duration)
 
-    fun start() {
-        val meta = mapOf("serviceHost" to serviceHost, "servicePort" to servicePort.toString())
-        val metaString = meta.toList().joinToString(prefix = "(", postfix = ")") { "${it.first}=${it.second}" }
+    protected open fun setup(options: O): O = options
 
-        logger.info("Start $serverName $metaString", meta = meta)
+    fun start(options: O = createDefaultOptions()) {
+        val options = setup(options)
 
-        onStart()
+        GlobalLogContext["serverName"] = serverName
+
+        val meta = mapOf("options" to options)
+
+        logger.info("Start $serverName", meta = meta)
+
+        onStart(options)
     }
 
     fun stop(timeout: Duration = 30.seconds) {

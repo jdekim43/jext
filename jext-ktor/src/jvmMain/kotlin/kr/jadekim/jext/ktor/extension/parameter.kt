@@ -1,39 +1,39 @@
 package kr.jadekim.jext.ktor.extension
 
 import io.ktor.http.*
-import io.ktor.server.application.*
 import io.ktor.server.request.*
+import io.ktor.server.routing.*
 import io.ktor.util.*
-import io.ktor.util.pipeline.*
 import kr.jadekim.server.http.exception.MissingParameterException
 
-inline val PipelineContext<*, ApplicationCall>.pathParam: Parameters get() = context.parameters
+inline val RoutingContext.pathParam: Parameters get() = call.parameters
 
-inline val PipelineContext<*, ApplicationCall>.queryParam: Parameters get() = context.request.queryParameters
+inline val RoutingContext.queryParam: Parameters get() = call.request.queryParameters
 
-suspend fun PipelineContext<*, ApplicationCall>.bodyParam(): Parameters? = context.receiveOrNull()
+suspend fun RoutingContext.bodyParam(): Parameters? =
+    runCatching { call.receiveNullable<Parameters>() }.getOrNull()
 
-fun PipelineContext<*, ApplicationCall>.pathParamSafe(key: String, default: String? = null): String? {
+fun RoutingContext.pathParamSafe(key: String, default: String? = null): String? {
     return pathParam[key] ?: default
 }
 
-fun PipelineContext<*, ApplicationCall>.pathParam(key: String, default: String? = null): String {
+fun RoutingContext.pathParam(key: String, default: String? = null): String {
     return pathParamSafe(key, default) ?: throw MissingParameterException("required $key")
 }
 
-fun PipelineContext<*, ApplicationCall>.queryParamSafe(key: String, default: String? = null): String? {
+fun RoutingContext.queryParamSafe(key: String, default: String? = null): String? {
     return queryParam[key] ?: default
 }
 
-fun PipelineContext<*, ApplicationCall>.queryParam(key: String, default: String? = null): String {
+fun RoutingContext.queryParam(key: String, default: String? = null): String {
     return queryParamSafe(key, default) ?: throw MissingParameterException("required $key")
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.bodyParamListSafe(key: String): List<String> {
+suspend fun RoutingContext.bodyParamListSafe(key: String): List<String> {
     return bodyParam()?.getAll(key) ?: emptyList()
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.bodyParamList(key: String): List<String> {
+suspend fun RoutingContext.bodyParamList(key: String): List<String> {
     val result = bodyParamListSafe(key)
 
     if (result.isEmpty()) {
@@ -43,15 +43,15 @@ suspend fun PipelineContext<*, ApplicationCall>.bodyParamList(key: String): List
     return result
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.bodyParamSafe(key: String, default: String? = null): String? {
+suspend fun RoutingContext.bodyParamSafe(key: String, default: String? = null): String? {
     return bodyParam()?.get(key) ?: default
 }
 
-suspend fun PipelineContext<*, ApplicationCall>.bodyParam(key: String, default: String? = null): String {
+suspend fun RoutingContext.bodyParam(key: String, default: String? = null): String {
     return bodyParamSafe(key, default) ?: throw MissingParameterException("required $key")
 }
 
-suspend inline fun <reified T : Any> PipelineContext<Unit, ApplicationCall>.body(): T = context.receive()
+suspend inline fun <reified T : Any> RoutingContext.body(): T = call.receive()
 
 fun Parameters?.toSingleValueMap(): Map<String, String> {
     return this?.toMap()

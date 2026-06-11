@@ -1,0 +1,30 @@
+[versions]
+jreleaser = "1.20.0"
+koin = "4.1.1"
+gson = "2.13.2"
+sentry = "8.31.0"
+datadog = "1.59.0"
+elastic = "1.55.4"
+hikaricp = "7.0.2"
+aws = "2.41.20"
+redisson = "4.1.0"
+cohort = "2.7.2"
+micrometer = "1.16.2"
+
+[libraries]
+koin-core = { module = "io.insert-koin:koin-core", version.ref = "koin" }
+koin-ktor = { module = "io.insert-koin:koin-ktor", version.ref = "koin" }
+gson = { module = "com.google.code.gson:gson", version.ref = "gson" }
+sentry = { module = "io.sentry:sentry", version.ref = "sentry" }
+sentry-kotlin = { module = "io.sentry:sentry-kotlin-extensions", version.ref = "sentry" }
+datadog-trace = { module = "com.datadoghq:dd-trace-ot", version.ref = "datadog" }
+elastic-apm = { module = "co.elastic.apm:apm-agent-api", version.ref = "elastic"}
+hikaricp = { module = "com.zaxxer:HikariCP", version.ref = "hikaricp" }
+aws-rds = { module = "software.amazon.awssdk:rds", version.ref = "aws" }
+aws-sts = { module = "software.amazon.awssdk:sts", version.ref = "aws" }
+redisson = { module = "org.redisson:redisson", version.ref = "redisson" }
+cohort = { module = "com.sksamuel.cohort:cohort-ktor", version.ref = "cohort" }
+micrometer-prometheus = { module = "io.micrometer:micrometer-registry-prometheus", version.ref = "micrometer" }
+
+[plugins]
+jreleaser = { id = "org.jreleaser", version.ref = "jreleaser" }

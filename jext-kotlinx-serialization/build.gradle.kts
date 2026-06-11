@@ -1,19 +1,9 @@
 plugins {
-    kotlin("multiplatform")
+    id("convention.kotlin-multiplatform")
+    id("convention.publish")
 }
 
 kotlin {
-    jvm {
-        compilations.all {
-            val jvmTarget: String by rootProject
-
-            kotlinOptions.jvmTarget = jvmTarget
-        }
-        testRuns["test"].executionTask.configure {
-            useJUnitPlatform()
-        }
-    }
-
     sourceSets {
         all {
             languageSettings {
@@ -23,29 +13,9 @@ kotlin {
 
         val commonMain by getting {
             dependencies {
-                val commonVersion: String by project
-                val kotlinxSerializationVersion: String by project
+                api(kt.kotlinx.serialization.json)
 
-                api("org.jetbrains.kotlinx:kotlinx-serialization-json:$kotlinxSerializationVersion")
-
-                compileOnly("kr.jadekim:common-encoder:$commonVersion")
-            }
-        }
-        val commonTest by getting {
-            dependencies {
-                implementation(kotlin("test-common"))
-                implementation(kotlin("test-annotations-common"))
-            }
-        }
-        val jvmMain by getting
-        val jvmTest by getting {
-            dependencies {
-                val junitVersion: String by project
-
-                implementation(kotlin("test-junit5"))
-                runtimeOnly("org.junit.jupiter:junit-jupiter-engine:$junitVersion")
-                compileOnly("org.junit.jupiter:junit-jupiter-api:$junitVersion")
-                compileOnly("org.junit.jupiter:junit-jupiter-params:$junitVersion")
+                compileOnly(jade.common.encoder)
             }
         }
     }

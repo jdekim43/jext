@@ -27,7 +27,8 @@ sealed interface TypeAwareMode {
 
 class SealedClassTypeAdapterFactory(
     val mode: TypeAwareMode,
-    val alternatives: List<TypeAdapterFactory> = emptyList(),
+    val enableFlattenNestedSealedClasses: Boolean = false,
+    val subclassTypeAdapters: List<TypeAdapterFactory> = emptyList(),
 ) : TypeAdapterFactory {
 
     override fun <T : Any> create(gson: Gson, type: TypeToken<T>): TypeAdapter<T>? {
@@ -37,14 +38,17 @@ class SealedClassTypeAdapterFactory(
             return null
         }
 
-        return SealedParentClassKeyValueTypeAdapter(klass, gson)
+        return when (mode) {
+            TypeAwareMode.KeyValue -> SealedParentClassKeyValueTypeAdapter(klass, gson, enableFlattenNestedSealedClasses, subclassTypeAdapters)
+        }
     }
 }
 
 class SealedParentClassKeyValueTypeAdapter<T : Any>(
     val klass: KClass<Any>,
     private val gson: Gson,
-    private val alternatives: List<TypeAdapterFactory> = emptyList(),
+    val enableFlattenNestedSealedClasses: Boolean = false,
+    private val subclassTypeAdapters: List<TypeAdapterFactory> = emptyList(),
 ) : TypeAdapter<T>() {
 
     override fun write(writer: JsonWriter, value: T?) {
@@ -53,17 +57,18 @@ class SealedParentClassKeyValueTypeAdapter<T : Any>(
             return
         }
 
-        val alternative = alternatives.firstNotNullOfOrNull { it.create(gson, TypeToken.get(value.javaClass)) }
+        val subclassTypeAdapter = subclassTypeAdapters.firstNotNullOfOrNull { it.create(gson, TypeToken.get(value.javaClass)) }
             ?: gson.getAdapter(value.javaClass)
 
         writer.beginObject()
         writer.name(value::class.getSealedClassName())
-        alternative.write(writer, value)
+        subclassTypeAdapter.write(writer, value)
         writer.endObject()
     }
 
     override fun read(reader: JsonReader): T? {
         if (reader.peek() == JsonToken.NULL) {
+            reader.nextNull()
             return null
         }
 
@@ -71,12 +76,23 @@ class SealedParentClassKeyValueTypeAdapter<T : Any>(
         val name = reader.nextName()
 
         @Suppress("UNCHECKED_CAST")
-        val innerKlass = klass.sealedSubclasses.firstOrNull { it.getSealedClassName() == name } as? KClass<T>
+        val innerKlass = klass.resolveSealedClasses().firstOrNull { it.getSealedClassName() == name } as? KClass<T>
             ?: throw Exception("$name is not found to be a data class of the sealed class ${klass.jvmName}")
 
-        val value = gson.getAdapter(innerKlass.java).read(reader)
+        val subclassTypeAdapter = subclassTypeAdapters.firstNotNullOfOrNull { it.create(gson, TypeToken.get(innerKlass.java)) }
+            ?: gson.getAdapter(innerKlass.java)
+
+        val value = subclassTypeAdapter.read(reader)
         reader.endObject()
 
         return innerKlass.objectInstance ?: value
+    }
+
+    private fun <A : Any> KClass<A>.resolveSealedClasses(): List<KClass<out A>> {
+        return if (enableFlattenNestedSealedClasses) {
+            sealedSubclasses + sealedSubclasses.flatMap { it.resolveSealedClasses() }
+        } else {
+            sealedSubclasses
+        }
     }
 }

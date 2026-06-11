@@ -10,12 +10,8 @@ import java.net.URI
 
 private val logger = LoggerFactory.getLogger("kr.jadekim.jext.exposed.koin.RdsUtils")
 
-fun rdsInit(urlString: String, username: String) {
-    if (!urlString.startsWith("jdbc:mysql:aws")) {
-        return
-    }
-
-    val uri = URI("mysql://" + urlString.substring("jdbc:mysql:aws://".length))
+fun initRdsIamAuth(urlString: String, username: String) {
+    val uri = URI( "tcp" + urlString.substring(urlString.indexOf("://")))
 
     logger.info("Init RDS ($username - $urlString)")
 
@@ -28,7 +24,8 @@ fun rdsInit(urlString: String, username: String) {
         .build()
     val token = utilities.generateAuthenticationToken { builder: GenerateAuthenticationTokenRequest.Builder ->
         builder.hostname(uri.host)
-            .port(uri.port).username(username)
+            .port(uri.port)
+            .username(username)
     }
 
     logger.info("Initialized RDS ($username - $urlString) with $identity ($token)")

@@ -1,8 +1,7 @@
 package kr.jadekim.jext.ktor.extension
 
-import io.ktor.server.application.*
 import io.ktor.server.response.*
-import io.ktor.util.pipeline.*
+import io.ktor.server.routing.*
 import kr.jadekim.common.exception.ErrorCode
 import kr.jadekim.server.http.exception.HttpServerException
 import kr.jadekim.server.protocol.ErrorResponse
@@ -10,19 +9,19 @@ import kr.jadekim.server.protocol.Response
 import kr.jadekim.server.protocol.SuccessResponse
 import java.util.*
 
-suspend fun PipelineContext<*, ApplicationCall>.success(
-    body: Any? = null,
+suspend inline fun <reified T> RoutingContext.success(
+    body: T? = null,
     meta: Response.Meta = Response.Meta(),
-) = context.respond(SuccessResponse(body, meta))
+) = call.respond(SuccessResponse(body, meta))
 
-suspend fun PipelineContext<*, ApplicationCall>.error(
+suspend inline fun <reified E> RoutingContext.error(
     code: ErrorCode,
     message: String,
-    data: Any? = null,
+    data: E? = null,
     meta: Response.Meta = Response.Meta(),
-) = context.respond(ErrorResponse(code, message, data, meta))
+) = call.respond(ErrorResponse(code, message, data, meta))
 
 fun HttpServerException.toResponse(
     locale: Locale? = null,
     meta: Response.Meta = Response.Meta(),
-) = toResponse(locale?.language , meta)
+) = toResponse(locale?.language, meta)

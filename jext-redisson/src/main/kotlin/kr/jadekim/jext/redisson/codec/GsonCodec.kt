@@ -9,7 +9,6 @@ import org.redisson.client.codec.BaseCodec
 import org.redisson.client.protocol.Decoder
 import org.redisson.client.protocol.Encoder
 import org.redisson.codec.JsonCodec
-import java.io.IOException
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import kotlin.reflect.KClass
@@ -17,7 +16,7 @@ import kotlin.reflect.KClass
 class GsonCodec<T : Any>(
     val typeToken: TypeToken<T>,
     private val gson: Gson = Gson(),
-) : BaseCodec(), JsonCodec<T> {
+) : BaseCodec(), JsonCodec {
 
     constructor(clazz: Class<T>, gson: Gson = Gson()) : this(TypeToken.get(clazz), gson)
 
@@ -41,6 +40,10 @@ class GsonCodec<T : Any>(
     private val decoder = Decoder<Any> { buf, _ ->
         gson.fromJson(InputStreamReader(ByteBufInputStream(buf)), typeToken)
     }
+
+    override fun getEncoder(): Encoder = encoder
+
+    override fun getDecoder(): Decoder<Any> = decoder
 
     override fun getValueEncoder(): Encoder = encoder
 
